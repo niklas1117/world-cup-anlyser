@@ -210,3 +210,50 @@ def find_meeting(team_a: str, team_b: str, match_results: dict) -> int | None:
         if {m['team1'], m['team2']} == {team_a, team_b}:
             return match_num
     return None
+
+
+# ---------------------------------------------------------------------------
+# Deterministic bracket-path tracing
+# ---------------------------------------------------------------------------
+
+def get_bracket_path(slot: str) -> list[int]:
+    """
+    Return the ordered list of match numbers a given slot passes through,
+    from R32 all the way to the Final.
+
+    slot examples: '1E' (Group E winner), '2I' (Group I runner-up)
+    """
+    r32_match = None
+    for match_num, (s1, s2) in R32_SLOTS.items():
+        if s1 == slot or s2 == slot:
+            r32_match = match_num
+            break
+
+    if r32_match is None:
+        return []
+
+    path = [r32_match]
+    current = r32_match
+    for match_num, (src1, src2) in KNOCKOUT_BRACKET.items():
+        if src1 == current or src2 == current:
+            path.append(match_num)
+            current = match_num
+
+    return path
+
+
+def find_first_common_match(slot_a: str, slot_b: str) -> int | None:
+    """
+    Return the earliest match number where the bracket paths of slot_a and
+    slot_b first converge (i.e. the round they would meet if both advance).
+    """
+    path_a = get_bracket_path(slot_a)
+    path_b = get_bracket_path(slot_b)
+    if not path_a or not path_b:
+        return None
+
+    set_a = set(path_a)
+    for match in path_b:
+        if match in set_a:
+            return match
+    return None
