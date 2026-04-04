@@ -1,0 +1,2 @@
+# No third-party dependencies – uses Python 3.10+ standard library only.
+# Requires Python >= 3.10 for the X | Y union-type hints.
