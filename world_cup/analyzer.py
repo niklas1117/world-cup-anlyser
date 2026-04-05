@@ -3,7 +3,7 @@ High-level analysis for the 2026 FIFA World Cup.
 """
 
 from .data import GROUPS, ROUND_NAMES
-from .simulator import find_first_common_match
+from .simulator import find_earliest_meeting
 
 
 def _all_teams() -> list[str]:
@@ -68,19 +68,20 @@ def trace_scenarios(team_a_name: str, team_b_name: str) -> dict:
     group_b = _find_group(team_b)
 
     scenarios = []
-    for pos_a in (1, 2):
-        for pos_b in (1, 2):
+    for pos_a in (1, 2, 3):
+        for pos_b in (1, 2, 3):
             slot_a = f'{pos_a}{group_a}'
             slot_b = f'{pos_b}{group_b}'
-            match_num = find_first_common_match(slot_a, slot_b)
+            match_num, is_exact = find_earliest_meeting(slot_a, slot_b)
             round_name = ROUND_NAMES.get(match_num) if match_num else None
             scenarios.append({
-                'pos_a':  pos_a,
-                'pos_b':  pos_b,
-                'slot_a': slot_a,
-                'slot_b': slot_b,
-                'match':  match_num,
-                'round':  round_name,
+                'pos_a':    pos_a,
+                'pos_b':    pos_b,
+                'slot_a':   slot_a,
+                'slot_b':   slot_b,
+                'match':    match_num,
+                'round':    round_name,
+                'is_exact': is_exact,
             })
 
     return {

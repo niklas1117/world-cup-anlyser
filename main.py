@@ -21,7 +21,7 @@ from world_cup.data import GROUPS
 
 
 def _ordinal(n: int) -> str:
-    return '1st' if n == 1 else '2nd'
+    return {1: '1st', 2: '2nd', 3: '3rd'}[n]
 
 
 def _print_scenarios(result: dict) -> None:
@@ -30,19 +30,30 @@ def _print_scenarios(result: dict) -> None:
     group_a = result['group_a']
     group_b = result['group_b']
 
-    print(f"\n{'═' * 56}")
+    has_inexact = any(not s['is_exact'] for s in result['scenarios'])
+
+    print(f"\n{'═' * 60}")
     print(f"  {team_a} (Group {group_a})  vs  {team_b} (Group {group_b})")
-    print(f"{'═' * 56}")
-    print(f"  {'Scenario':<36}  {'First meeting'}")
-    print(f"  {'-' * 36}  {'-' * 20}")
+    print(f"{'═' * 60}")
+    print(f"  {'Scenario':<38}  {'Meeting'}")
+    print(f"  {'-' * 38}  {'-' * 18}")
 
     for s in result['scenarios']:
         scenario = (
             f"{team_a} {_ordinal(s['pos_a'])}, "
             f"{team_b} {_ordinal(s['pos_b'])}"
         )
-        meeting = s['round'] or '—'
-        print(f"  {scenario:<36}  {meeting}")
+        if s['round'] is None:
+            meeting = '—'
+        elif s['is_exact']:
+            meeting = s['round']
+        else:
+            meeting = s['round'] + ' *'
+        print(f"  {scenario:<38}  {meeting}")
+
+    if has_inexact:
+        print(f"\n  * earliest possible — depends on 3rd-place bracket draw")
+        print(f"    (only the best 8 of 12 third-place teams qualify)")
 
     print()
 

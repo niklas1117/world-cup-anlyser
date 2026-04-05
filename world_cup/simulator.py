@@ -16,7 +16,7 @@ Knockout stage:
 import random
 from itertools import combinations
 
-from .data import GROUPS, R32_SLOTS, KNOCKOUT_BRACKET, TEAM_STRENGTH
+from .data import GROUPS, R32_SLOTS, KNOCKOUT_BRACKET, TEAM_STRENGTH, ROUND_NAMES
 
 # ---------------------------------------------------------------------------
 # Group-stage helpers
@@ -216,44 +216,80 @@ def find_meeting(team_a: str, team_b: str, match_results: dict) -> int | None:
 # Deterministic bracket-path tracing
 # ---------------------------------------------------------------------------
 
-def get_bracket_path(slot: str) -> list[int]:
-    """
-    Return the ordered list of match numbers a given slot passes through,
-    from R32 all the way to the Final.
+# Ordered round names for comparing "earliness"
+_ROUND_ORDER = {
+    'Round of 32': 0,
+    'Round of 16': 1,
+    'Quarterfinal': 2,
+    'Semifinal': 3,
+    'Final': 4,
+}
 
-    slot examples: '1E' (Group E winner), '2I' (Group I runner-up)
-    """
-    r32_match = None
-    for match_num, (s1, s2) in R32_SLOTS.items():
-        if s1 == slot or s2 == slot:
-            r32_match = match_num
-            break
 
-    if r32_match is None:
-        return []
-
-    path = [r32_match]
-    current = r32_match
+def _path_from_match(start: int) -> list[int]:
+    """Trace the bracket path forward from a given match number to the Final."""
+    path = [start]
+    current = start
     for match_num, (src1, src2) in KNOCKOUT_BRACKET.items():
         if src1 == current or src2 == current:
             path.append(match_num)
             current = match_num
-
     return path
 
 
-def find_first_common_match(slot_a: str, slot_b: str) -> int | None:
+def _possible_r32_matches(slot: str) -> list[int]:
     """
-    Return the earliest match number where the bracket paths of slot_a and
-    slot_b first converge (i.e. the round they would meet if both advance).
-    """
-    path_a = get_bracket_path(slot_a)
-    path_b = get_bracket_path(slot_b)
-    if not path_a or not path_b:
-        return None
+    Return all R32 match numbers this slot could be assigned to.
 
-    set_a = set(path_a)
-    for match in path_b:
-        if match in set_a:
-            return match
-    return None
+    For '1X' / '2X' slots there is exactly one match.
+    For '3X' slots the team could land in any R32 match that lists group X
+    as an acceptable source, depending on which other groups also qualify
+    their 3rd-place team.
+    """
+    if not slot.startswith('3'):
+        return [m for m, (s1, s2) in R32_SLOTS.items() if s1 == slot or s2 == slot]
+
+    group = slot[1]
+    return [m for m, groups in _THIRD_PLACE_MATCHES.items() if group in groups]
+
+
+def find_earliest_meeting(slot_a: str, slot_b: str) -> tuple[int | None, bool]:
+    """
+    Return (match_num, is_exact) for the earliest round two slots can meet.
+
+    is_exact=True  → the meeting round is fixed regardless of draw.
+    is_exact=False → this is the *earliest possible* meeting; the actual
+                     round depends on the 3rd-place bracket draw.
+
+    Two 3rd-place teams can never share the same R32 slot, so that
+    combination is excluded when both slots start with '3'.
+    """
+    both_third = slot_a.startswith('3') and slot_b.startswith('3')
+    is_exact = not (slot_a.startswith('3') or slot_b.startswith('3'))
+
+    options_a = _possible_r32_matches(slot_a)
+    options_b = _possible_r32_matches(slot_b)
+
+    best_match: int | None = None
+    best_order: int = 999
+
+    for r32_a in options_a:
+        for r32_b in options_b:
+            # Two 3rd-place teams are never put in the same R32 slot
+            if both_third and r32_a == r32_b:
+                continue
+
+            if r32_a == r32_b:
+                match = r32_a          # direct R32 meeting
+            else:
+                path_b = _path_from_match(r32_b)
+                path_a_set = set(_path_from_match(r32_a))
+                match = next((m for m in path_b if m in path_a_set), None)
+
+            if match is not None:
+                order = _ROUND_ORDER.get(ROUND_NAMES.get(match, ''), 999)
+                if order < best_order:
+                    best_order = order
+                    best_match = match
+
+    return best_match, is_exact
