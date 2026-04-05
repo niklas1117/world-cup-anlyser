@@ -226,7 +226,7 @@ _ROUND_ORDER = {
 }
 
 
-def _path_from_match(start: int) -> list[int]:
+def path_from_match(start: int) -> list[int]:
     """Trace the bracket path forward from a given match number to the Final."""
     path = [start]
     current = start
@@ -253,13 +253,17 @@ def _possible_r32_matches(slot: str) -> list[int]:
     return [m for m, groups in _THIRD_PLACE_MATCHES.items() if group in groups]
 
 
-def find_earliest_meeting(slot_a: str, slot_b: str) -> tuple[int | None, bool]:
+def find_earliest_meeting(
+    slot_a: str, slot_b: str
+) -> tuple[int | None, bool, int | None, int | None]:
     """
-    Return (match_num, is_exact) for the earliest round two slots can meet.
+    Return (match_num, is_exact, r32_a, r32_b) for the earliest round two
+    slots can meet.
 
-    is_exact=True  → the meeting round is fixed regardless of draw.
-    is_exact=False → this is the *earliest possible* meeting; the actual
-                     round depends on the 3rd-place bracket draw.
+    match_num  – the first match where they would face each other
+    is_exact   – True if the round is fixed (no 3rd-place ambiguity)
+    r32_a/b    – the specific R32 match numbers that produce that meeting
+                 (useful for drawing bracket paths)
 
     Two 3rd-place teams can never share the same R32 slot, so that
     combination is excluded when both slots start with '3'.
@@ -272,18 +276,19 @@ def find_earliest_meeting(slot_a: str, slot_b: str) -> tuple[int | None, bool]:
 
     best_match: int | None = None
     best_order: int = 999
+    best_r32_a: int | None = None
+    best_r32_b: int | None = None
 
     for r32_a in options_a:
         for r32_b in options_b:
-            # Two 3rd-place teams are never put in the same R32 slot
             if both_third and r32_a == r32_b:
                 continue
 
             if r32_a == r32_b:
-                match = r32_a          # direct R32 meeting
+                match = r32_a
             else:
-                path_b = _path_from_match(r32_b)
-                path_a_set = set(_path_from_match(r32_a))
+                path_b = path_from_match(r32_b)
+                path_a_set = set(path_from_match(r32_a))
                 match = next((m for m in path_b if m in path_a_set), None)
 
             if match is not None:
@@ -291,5 +296,7 @@ def find_earliest_meeting(slot_a: str, slot_b: str) -> tuple[int | None, bool]:
                 if order < best_order:
                     best_order = order
                     best_match = match
+                    best_r32_a = r32_a
+                    best_r32_b = r32_b
 
-    return best_match, is_exact
+    return best_match, is_exact, best_r32_a, best_r32_b
